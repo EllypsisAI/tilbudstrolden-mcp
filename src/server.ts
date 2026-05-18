@@ -97,6 +97,9 @@ Set country via update_household. Search terms must be in the local language (Da
 
 ## Tool groups
 
+### Onboarding (skill)
+- start_onboarding: returns the protocol the assistant should follow for new users. Call this when no household is configured, or when the user asks to "set up", "get started", or "sign me up". The tool tells you which questions to ask and which tools to call after each answer.
+
 ### Deals
 - search_deals: find products by keyword across stores
 - get_store_offers: browse one store's catalog
@@ -123,10 +126,10 @@ Set country via update_household. Search terms must be in the local language (Da
 
 ## Workflow
 
-First-time setup (the getting-started prompt walks the user through):
+First-time setup — call start_onboarding to get the protocol, then follow it. The protocol walks through:
 1. update_household (country, people, preferred stores)
 2. update_pantry (salt, oil, etc.)
-3. add_recipe (a few recipes)
+3. add_recipe (optional — DK households get starter recipes seeded automatically)
 4. plan_and_shop
 
 Common queries:
@@ -213,6 +216,100 @@ server.prompt(
       },
     ],
   }),
+);
+
+// ============================================================
+// Onboarding (skill: protocol the assistant follows for new users)
+// ============================================================
+
+const ONBOARDING_PROTOCOL = `# Onboarding protocol
+
+You are guiding a new user through TilbudsTrolden setup. This is a one-time conversational flow. Follow the sequence below — do not batch steps, do not skip steps, and confirm each answer briefly before moving on.
+
+Tone: friendly, efficient, not preachy. The user wants to get to meal planning, not a tutorial. Keep replies short. Use the user's language if they're writing in Danish, Norwegian, Swedish, or Finnish.
+
+## Step 1 — Country
+
+Ask which Nordic country the user shops in.
+
+Accepted values: Denmark (DK), Norway (NO), Sweden (SE), Finland (FI). If the user names another country, explain that deal data only covers these four markets and ask them to pick one.
+
+After the user answers, call:
+  update_household({ country: "<DK|NO|SE|FI>" })
+
+## Step 2 — Household and dietary restrictions
+
+Ask how many people you cook for at home, and whether anyone has restrictions worth noting. Common ones: no pork, vegetarian, no shellfish, lactose-free, gluten-free.
+
+Accept brief answers. If the user just gives a number, set defaultServings without listing every person by name. If they mention restrictions, create one entry per person (or a single household-level entry if they speak collectively). Leave defaultSchedule empty — it defaults to all days.
+
+After the user answers, call:
+  update_household({ defaultServings: <n>, people: [{ name, dietaryRestrictions, defaultSchedule: {} }] })
+
+## Step 3 — Preferred stores
+
+Tell the user which grocery chains TilbudsTrolden knows in their country, then ask which 2-4 they shop at most often. Call list_stores({}) to fetch the current directory before asking.
+
+Map each store name the user mentions to its dealer ID from list_stores. Assign priority 1 to the closest/favorite, 2 to the next, and so on.
+
+After the user answers, call:
+  update_household({ stores: [{ name, dealerId, priority }] })
+
+## Step 4 — Pantry staples
+
+Ask what staples the user always has at home. Only suggest examples if asked (salt, pepper, olive oil, soy sauce, rice, pasta, flour, sugar). These get excluded from shopping lists.
+
+After the user answers, call:
+  update_pantry({ add: ["item1", "item2", ...], remove: [] })
+
+## Confirmation
+
+Read back the configuration in one or two sentences and ask if the user wants to plan this week's dinners now. Example:
+
+  "Set you up: 3 people in Denmark, shopping at Netto and REMA 1000, no pork, with rice and soy sauce already in your pantry. Want to plan this week's dinners?"
+
+If yes, call plan_and_shop. If no, stop — they're onboarded.
+
+## What's coming later
+
+Login, payment, and skill downloads will be part of this flow once the hosted backend exists. For now, state is local and the four steps above are the whole flow.
+`;
+
+server.tool(
+  "start_onboarding",
+  "Returns the onboarding protocol the assistant should follow to set up a new user. USE WHEN: no household is configured yet, or when the user asks to 'set up', 'get started', or 'sign me up'. Returns the full protocol (steps, tone, which tools to call after each answer) for fresh users, or a short status summary for already-onboarded users. NOT FOR: changing one specific setting — use update_household / update_pantry directly for that.",
+  {},
+  async () => {
+    const household = await store.getHousehold();
+    const onboarded = household.stores.length > 0 || household.people.length > 0;
+
+    if (!onboarded) {
+      return {
+        content: [{ type: "text" as const, text: ONBOARDING_PROTOCOL }],
+      };
+    }
+
+    const [pantry, recipes] = await Promise.all([store.getPantry(), store.getRecipes()]);
+    const locale = getLocale(household.country);
+    return {
+      content: [
+        {
+          type: "text" as const,
+          text: [
+            `Already onboarded.`,
+            ``,
+            `Country: ${locale.countryName} (${household.country})`,
+            `People: ${household.people.length || household.defaultServings}`,
+            `Preferred stores: ${household.stores.length}`,
+            `Pantry items: ${pantry.length}`,
+            `Recipes: ${recipes.length}`,
+            ``,
+            `To change a setting, call update_household / update_pantry directly. To plan a week, call plan_and_shop.`,
+          ].join("\n"),
+        },
+      ],
+    };
+  },
 );
 
 // ============================================================
