@@ -37,7 +37,7 @@ Multi-phase, not one-shot. Each phase has a deliverable and a verification step 
 Per the user's harness (full description in `workspace/alignment.md`):
 
 - `workspace/alignment.md` — canonical, living document.
-- `workspace/journal/log.md` — append-only session log. New entry per session: `## [YYYY-MM-DD HH:MM] {topic}` with what happened, what was decided in passing, what's open. Tail and grep stay clean that way.
+- `workspace/journal/YYYY-MM-DD.md` — one file per day. Sessions within a day are H2 sections: `## [HH:MM] {topic}` with what happened, what was decided in passing, what's open. If multiple distinct sessions in a day warrant separate referencing, suffix with `-{topic}` (e.g. `2026-05-18-ui-quirks.md`). Other docs can link to a specific date for context (e.g. "see `journal/2026-05-18.md` for the UI tradeoff discussion").
 - `workspace/decisions/<slug>.md` — one file per auditable decision (DB choice, skill mechanism, payment processor, etc.). Template lives in alignment.md. Use `agent: claude`, no model field.
 - `workspace/raw/` — immutable inputs (research notes, transcripts, external docs).
 
@@ -66,6 +66,6 @@ Don't write a specific model version identifier into any committed file. Use `cl
 
 ## What to do silently
 
-- Read `workspace/alignment.md` and `workspace/journal/log.md` at session start.
-- Append a journal entry at session end with what happened, decisions in passing, open items.
+- Read `workspace/alignment.md` and recent entries in `workspace/journal/` at session start (typically last 3-5 days; reach further if current work references older context, or follow date-pointers from docs).
+- At session end, append today's session as a new H2 section in `workspace/journal/YYYY-MM-DD.md` (create the file if it doesn't exist yet) with what happened, decisions in passing, open items.
 - Verify branch before any commit.
