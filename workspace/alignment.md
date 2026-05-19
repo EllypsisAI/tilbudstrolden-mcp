@@ -2,23 +2,23 @@
 
 ## Context
 
-Dette er kun et alignment-dokument. Vi planlægger ikke implementering her, og vi forsøger ikke at scope første kodefase. Formålet er at få vision, arkitektur, terminologi, repo-state og arbejdsmetodologi nedfældet ét sted, så vi (user + Claude) har en kanonisk reference når vi senere går i gang med faser.
+Dette er det kanoniske alignment-dokument for projektet — vision, arkitektur, terminologi, repo-state og arbejdsmetodologi ét sted. Det er PRD-ækvivalenten i vores hybrid spec-driven workflow (se `decisions/per-phase-spec-workflow.md`).
 
-### Hvorfor kun alignment - og ikke teknisk plan endnu
+Dokumentet er et levende artefakt. Når en sektion ændrer sig (fordi vi har lært noget eller låst en beslutning), opdateres den. Beslutninger der er auditerbare (skill-mekanisme, DB-valg, arkitekturlag) får deres egne filer i `workspace/decisions/` med tradeoffs og alternativer — alignment-doc'et opsummerer outputtet.
 
-Claude's default mentale model er træningsdata-gennemsnit. Uden plugins der opgraderer referencerammen scoper jeg teknik som om det var 2020: SaaS-pattern, REST CRUD, frontend-først, monolitisk backend, brugeren operer UI. Det er præcis det vi *ikke* vil bygge. Agent-native, klient-side skills og hosted multi-user MCP er ikke i mit defaults i samme grad som en CRUD-app i Django.
+### Hvor vi er
 
-Konsekvens: plugins skal installeres og arbejdes igennem **før** teknisk planlægning, ellers er planen forældet før den skrives. Det er derfor fase 0 (alignment) og fase 1 (plugin/learning) er adskilt fra teknisk planlægning. Mellem fase 1 og fase 2 reviderer vi alignment-doc med det vi har lært, og *så* tager vi teknisk planlægning fase for fase.
-
-Dokumentet er et levende artefakt. Når en sektion ændrer sig (fx fordi vi lærer noget under plugin-fasen), opdateres det.
+- **Fase 0 (alignment): done.** Vision + arkitektur-skitse lagt fast 2026-05-18.
+- **Fase 1 (plugin/learning): done.** mcp-apps-marketplace gennemlæst direkte (plugin loadede ikke som Agent Skills). Digest i `workspace/raw/mcp-apps-docs-digest.md`. To kerne-antagelser i alignment-doc'et blev korrigeret som følge.
+- **Næste:** Roadmap er fastlagt i `workspace/roadmap.md`. Hver station co-writes som spec i `workspace/specs/` lige før den eksekveres.
 
 ---
 
 ## Vision (kanonisk formulering)
 
-**Premise:** Samme kerne-funktionalitet som SaaS dør i bunken. Samme kerne-funktionalitet som agent-native app overlever. Brugeren installerer ikke en app - de installerer en connector/MCP i deres AI-klient (Claude, ChatGPT).
+**Premise:** Samme kerne-funktionalitet som SaaS dør i bunken. Samme kerne-funktionalitet som agent-native app overlever. Brugeren installerer ikke en app — de installerer en connector/MCP i deres AI-klient (Claude, ChatGPT).
 
-**Mål:** En agent-native mad-app der hjælper husstande med at spise godt og billigt ved at fjerne friktionen i madplanlægning, logning og indkøb. Agenten gør arbejdet. Brugeren uploader et billede af måltidet eller bare svarer på et spørgsmål - resten er automatisk.
+**Mål:** En agent-native mad-app der hjælper husstande med at spise godt og billigt ved at fjerne friktionen i madplanlægning, logning og indkøb. Agenten gør arbejdet. Brugeren uploader et billede af måltidet eller bare svarer på et spørgsmål — resten er automatisk.
 
 **Hvorfor mad-apps fejler i dag:** Manglende menneskelig disciplin pga. høj friktion. Manuel logning, manuel pantry-opdatering, manuel ingrediens-indtastning. Agent-native fjerner det friktion-bjerg.
 
@@ -40,40 +40,85 @@ Dokumentet er et levende artefakt. Når en sektion ændrer sig (fx fordi vi lær
 
 | Lag | Ansvar |
 |-----|--------|
-| **MCP** | Capabilities. Hvad agenten *kan* udføre. Stateless tools. |
-| **Skills** | Klient-side protokoller. *Hvornår* og *hvordan* agenten skal handle. |
-| **Backend** | Per-bruger state. Pantry, allergier, præferencer, historik, log. |
-| **UI** | Minimal. Read i klient. Write kun til credentials og payment. |
+| **MCP** | Capabilities. Hvad agenten *kan* udføre. Stateless tools (model-visible og app-only). |
+| **Skills** | Klient-side protokoller. *Hvornår* og *hvordan* agenten skal handle. Distribueret tieret via tool-content (Tier 1-3, se `decisions/skill-distribution-tiered.md`). |
+| **Backend** | Per-bruger state. Pantry, allergier, præferencer, historik, log. Moaten. |
+| **UI** | To overflader: in-chat MCP App View (read + interaktive primitiver) og out-of-band web UI (kun til credentials og payment). |
 
-### Den centrale designindsigt om skills
+### Vi er en MCP App, ikke en klassisk MCP-server
 
-Skills er **ikke** kode i vores app. De er klient-side artefakter (Claude Skills, ChatGPT custom instructions, eller hvad klienten nu bruger). Vi *distribuerer* dem via tool-responser:
+Beslutning: `decisions/mcp-app-vs-classic-server.md`.
 
-- Hvert MCP-tool kan returnere to slags output: (a) data, (b) en eventuel skill-definition klienten skal installere i brugerens miljø.
-- Eksempel: Onboarding-tool returnerer brugerens initiale data + en skill der definerer hvordan klienten fremadrettet bruger vores tools.
-- Implikation: Vores MCP er platform-agnostisk for skill-mekanikken, men ansvarlig for skill-*indholdet*. Hvilken klient der installerer det, og hvordan, er klientens problem.
+Tekst-only chat dræber mad-apps — text walls får brugere til at churne. Tekst er sekventiel kommunikation (én part taler ad gangen); UI er parallel (brugeren ser sin pantry mens agenten taler). Vi bygger derfor som MCP App: tools registreres med `_meta.ui.resourceUri` der peger på en `ui://`-resource, host renderer i sandboxed iframe, View'et kommunikerer bidirektionalt via PostMessageTransport.
+
+Konkrete UI-anvendelser:
+- Billed-upload (måltid, kvittering) vises og bekræftes mens agenten analyserer.
+- Pantry-edit (tjek/uncheck ingredienser) uden tekst-beskrivelse.
+- Indkøbsliste som live UI-element der opdaterer mens serveren optimerer.
+- Interaktiv bekræftelse af forslag (én round-trip i stedet for tekst-ping-pong).
+
+Graceful degradation er obligatorisk: hosts uden UI-kapabilitet får tekst-fallback via `content`-arrayet, og funktionen er stadig komplet.
+
+### To UI-overflader
+
+1. **In-chat MCP App View.** Embedded i agent-konteksten. Til visualisering, billed-upload, pantry-edit, live indkøbsliste, interaktiv bekræftelse. Bundlet HTML/JS via Vite + `vite-plugin-singlefile`. CSP-deklareret per resource.
+2. **Out-of-band web UI.** Brugeren ankommer via signed link. Kun til ting agenten ikke kan udføre selv: credentials og payment. Holdes minimal — én side per intent.
+
+UI skriver aldrig direkte til backend. Alle writes går gennem tool-kald (model-visible eller app-only).
+
+### Intelligence-laget: tre tools-niveauer
+
+Beslutning: `decisions/three-layer-tool-architecture.md`.
+
+| Lag | Synlighed | Brug | Eksempler |
+|-----|-----------|------|-----------|
+| **A — Model-visible** (`visibility: ["app","model"]`) | Agenten + UI | Få (4-6), semantisk rige kapabiliteter | `start_onboarding`, `suggest_meals`, `log_meal`, `plan_shopping`, `manage_household` |
+| **B — App-only** (`visibility: ["app"]`) | Kun UI | Polling, chunking, interaktive primitiver | `poll_image_analysis`, `get_recipe_chunk`, `confirm_pantry_changes`, `request_payment_session` |
+| **C — Internt** | Ingen MCP-eksponering | Ren TypeScript-orchestration | Tjek-cache, embedding-similarity, scoring-pipeline, retry-logik, optimering |
+
+Det er hvad der skiller en agent-native app fra en tools-bag. I dag har vi 18 model-visible tools — agenten vælger trin for trin og kan slude. Efter konsolidering vælger agenten mellem 4-6 kapabiliteter; serveren orkestrerer internt. Compounding-værdi (Tjek-cache, scoring) bor i lag C og høster afkast hver gang lag A/B kalder den.
+
+### Skill-distribution: tieret med user-permission gate
+
+Beslutning: `decisions/skill-distribution-tiered.md`.
+
+MCP-spec'en har ikke et felt der automatisk distribuerer skills via tool-responser. Vi bygger derfor en *konvention* oven på spec'en: tool-responsens tekst-indhold kan indeholde skill-instruktion som klient-agenten følger — men kun efter eksplicit brugerautorisation.
+
+| Tier | Klient | Mekanisme |
+|------|--------|-----------|
+| 1 | Claude Code, Claude Desktop m. fs-MCP | Tool returnerer skill-content med fed-tekst permission-gate ("DO NOT create this skill unless the user has explicitly authorized it") + reasoning. Klient-agenten spørger bruger, skriver derefter til `~/.claude/skills/...`. |
+| 2 | Claude.ai web, ChatGPT med custom instructions | Tool returnerer copy-pasteable tekst. Brugeren udfører action, agenten guider. |
+| 3 | Alt andet | Tekst-fallback. Ingen klient-side personalisering. Funktionen virker fuldt ud via tools. |
+
+Permission-gate er **mitigation for prompt injection**: instruktionen "skriv en fil" bliver til "bed brugeren om lov til at skrive en fil". Sidstnævnte er user-mediated handling, ikke fjernkilde-injection. Det gør konstruktionen robust over for fremtidige hardenings af klient-Claude's injection-modstand.
 
 ### Onboarding er et tool, ikke en prompt
 
-Klienten kalder onboarding-tool på første interaktion. Toolet fortæller klienten hvad der skal ske (skill-oprettelse, auth, payment, første touchpoint). Resultat: konto + initial data i backend.
+Klienten kalder `start_onboarding` på første interaktion. Toolet returnerer: (a) data nødvendig for første touchpoint (husstand-skabelon, default-præferencer), (b) tekst-instruktioner til agenten om næste skridt (auth, payment, første interaktion), (c) skill-content med permission-gate hvis klienten er tier 1.
 
-### UI-princip
-
-Read i klient. Write kun til ting brugeren *skal* udføre selv: credentials, betaling. Resten udfører agenten.
+Det er *ikke* en skill-payload spec'en parser automatisk — det er konvention via tool-content. Se skill-decision for detaljer.
 
 ### Backend er moaten
 
-State lever i backend. Klienten er udskiftelig. Brugeren skifter mellem Claude og ChatGPT uden at miste sin pantry eller historik. Det er der differentieringen bygges - ikke i MCP'en (som er tynd) eller UI (som er minimal).
+State lever i backend. Klienten er udskiftelig. Brugeren skifter mellem Claude og ChatGPT uden at miste sin pantry eller historik.
+
+**Portabilitet kommer fra:** stateless tools + tekst-fallback (tier 3) + backend som sandhedskilde. **Ikke fra** tool-returnerede skill-definitioner (det misforstod alignment-doc'et oprindeligt — se phase-1-digest §6c).
+
+Skills i tier 1/2 er enhancement, ikke krav. Tier 3 har fuld funktionalitet — bare med flere afklarende spørgsmål per session fordi agenten ikke har præferencer i sin kontekst.
 
 ---
 
 ## Domæneglossar
 
-- **Klient:** AI-agent brugeren bruger (Claude, ChatGPT, andet). Operer vores MCP og installerer vores skills.
-- **MCP tool:** Capability vores server eksponerer. Kalddes af klient på vegne af bruger.
-- **Skill:** Klient-side instruktion-sæt der definerer hvornår/hvordan klienten bruger vores tools. Distribueret via tool-responser, installeret i brugerens klient-miljø.
-- **Backend:** Hosted database + API der holder per-bruger state. Kilden til sandhed for husstand, pantry, log, præferencer.
-- **Husstand:** Den primære domæne-entitet. Indeholder personer, allergier, butikspræferencer, default-portioner.
+- **Klient:** AI-agent brugeren bruger (Claude, ChatGPT, andet). Operer vores MCP og installerer evt. vores skills.
+- **MCP-server:** Vores server der eksponerer tools. Det vi koder.
+- **MCP App:** En MCP-server der eksponerer tools med UI-metadata (`_meta.ui.resourceUri`). Det vi bygger.
+- **View:** UI'et der renderes i klient-host'ens sandboxed iframe. Bundled HTML/JS med App-klasse og PostMessageTransport.
+- **Tool, model-visible:** Tool agenten ser og kan kalde. Lag A i tre-lags-modellen.
+- **App-only tool:** Tool med `visibility: ["app"]` — skjult fra modellen, kun kaldbart fra View. Lag B.
+- **Skill:** Klient-side instruktion-sæt der definerer hvornår/hvordan klienten bruger vores tools. Distribueret tieret via tool-content med permission-gate.
+- **Backend:** Hosted database + API der holder per-bruger state. Kilden til sandhed.
+- **Husstand:** Den primære domæne-entitet. Personer, allergier, butikspræferencer, default-portioner.
 - **Pantry:** Liste af ingredienser brugeren allerede har. Ekskluderes fra indkøbslister.
 - **Touchpoint:** Brugerens første kontakt med appen efter installation. Etablerer baseline-data.
 
@@ -83,77 +128,105 @@ State lever i backend. Klienten er udskiftelig. Brugeren skifter mellem Claude o
 
 ### Hvad findes (cornerstones)
 
-**18 MCP tools** dækker alle 6 vision-kapabiliteter:
+**18 MCP tools** dækker alle 6 vision-kapabiliteter, men alle som klassisk MCP — ingen UI-lag, alle model-visible:
 - Deals: `search_deals`, `get_store_offers`, `list_stores`, `deals_this_week`
 - Recipes: `get_recipes`, `add_recipe`, `remove_recipe`
 - Household: `get_household`, `update_household`
 - Pantry: `get_pantry`, `update_pantry`
 - Log: `log_meal`, `get_meal_history`, `log_spend`, `get_spend_log`
-- Planning + shopping: `score_recipes`, `generate_shopping_list`, `plan_and_shop` (one-shot: score → optimize → shopping list)
+- Planning + shopping: `score_recipes`, `generate_shopping_list`, `plan_and_shop`
 
-**3 MCP prompts:** `getting-started`, `meal-plan`, `deal-scout`
+**3 MCP prompts:** `getting-started`, `meal-plan`, `deal-scout`.
 
-**Tjek API integration** (`src/api.ts`): 3-retry exponential backoff, 8s timeout, 4 concurrent requests max, in-memory dealer cache for DK, multi-country (DK/NO/SE/FI), public API uden auth.
+**Tjek API integration** (`src/api.ts`): 3-retry exponential backoff, 8s timeout, 4 concurrent requests max, in-memory dealer cache for DK, multi-country (DK/NO/SE/FI), public API uden auth. **Det her er candidate-kode for lag C** i den nye arkitektur.
 
-**Datamodel** (`src/store.ts`): Zod-valideret schema. Entities: Household (people, dietaryRestrictions, stores, country, defaultServings), Pantry (string[]), Recipe (ingredients, servings, complexity, cuisineType, proteinType), Ingredient (name, quantity, searchTerms, category), MealLogEntry, SpendLogEntry. Atomic read-modify-write via mutex.
+**Datamodel** (`src/store.ts`): Zod-valideret schema. Entities: Household, Pantry, Recipe, Ingredient, MealLogEntry, SpendLogEntry. Atomic read-modify-write via mutex.
 
-**Storage:** Single JSON-fil i `~/.tilbudstrolden.json` (konfigurerbar via `TILBUDSTROLDEN_DATA` env var).
+**Storage:** Single JSON-fil i `~/.tilbudstrolden.json` (konfigurerbar via `TILBUDSTROLDEN_DATA` env var). Ikke SQLite. Migration når DB-valg er truffet.
 
 **Build:** TypeScript ES2022, Node ≥18, vitest tests, biome lint, tsx watch dev.
 
-### Hvad mangler vs vision
+### Hvad mangler vs vision (post-fase-1)
 
-- **Onboarding tool** - kun en prompt (`getting-started`), ikke et tool klienten kalder
-- **Hosted backend** - lokal JSON, ingen cloud, ingen multi-device
-- **Multi-user / auth** - single household pr. fil, ingen accounts
-- **Skill-creation i tool responses** - tools returnerer kun data, ingen skill-definitioner
-- **Payment/billing** - ingen integration, ingen subscription state
-- **Scheduled tasks** - ingen job scheduler
-- **Image recognition** - ingen billed-analyse af måltider/kvitteringer
-- **Notifications** - ingen aktiv alerting
+| Gap | Kategori |
+|-----|----------|
+| MCP App-arkitektur | Hele UI-laget. Bundled HTML/JS, App-klasse, PostMessageTransport, CSP-deklarationer. |
+| Tre-lags tool-konsolidering | De 18 tools skal kollapse til 4-6 model-visible + app-only primitiver. Lag C bygges som internt TypeScript. |
+| Onboarding-tool | Kun en prompt (`getting-started`) i dag. Skal være tool der returnerer data + skill-content (tier 1) + tekst-instruktioner. |
+| Hosted backend | Lokal JSON i dag. Ingen cloud, ingen multi-device. DB-valg åbent. |
+| Multi-user / auth | Single husstand pr. fil. Ingen accounts. |
+| Skill-distribution mekanisme | Tools returnerer kun data i dag. Tier 1/2/3 + permission-gate skal implementeres. |
+| Payment/billing | Ingen Stripe-integration, ingen subscription/usage state. |
+| Scheduled tasks | Ingen job scheduler. Hvor de lever afhænger af hosting-model. |
+| Image recognition | Ingen billed-analyse. Spec-noten "file-uploads not yet implemented" gør pattern usikkert. |
+| Notifications | Ingen aktiv alerting. |
 
-### Repo-strategi (afklares senere)
+### Repo-strategi (åbent)
 
-Vi er pt. i en kopi/fork af `olgasafonova/tilbudstrolden-mcp` på branch `claude/agent-native-food-app-Mb6B3`. Forholdet til original-repo (samarbejde, fork, license, egen rewrite) er ikke afklaret - tages op før vi laver substantielle ændringer.
+Vi er pt. i en kopi/fork af `olgasafonova/tilbudstrolden-mcp` på branch `claude/agent-native-food-app-Mb6B3`. Forholdet til original-repo (samarbejde, fork, license, egen rewrite) er ikke afklaret — tages op før vi laver substantielle ændringer.
+
+**Sidetracks at huske:**
+- `claude/agent-native-food-app-9g04a` (remote): én commit der implementerede `start_onboarding`-tool i parallel session uden alignment-baseline. Evalueres separat ved roadmap-stage "onboarding-tool" — cherry-pick, omskriv eller drop.
 
 ---
 
 ## Arbejdsmetodologi
 
 ### Roller
+
 - **User + Claude:** Leads og main. Bevidste beslutninger træffes her.
 - **Subagents:** Delegerede arbejdsenheder. Bruges til parallel exploration, isoleret implementering, code review.
-- **Disciplin:** Multi-phase projekt, ikke one-shot. Hver fase har klar afgrænsning og verifikation før næste starter.
+- **Disciplin:** Multi-fase projekt, ikke one-shot. Hver fase har klar afgrænsning og verifikation før næste starter.
+
+### Hybrid workflow: spec per fase
+
+Beslutning: `decisions/per-phase-spec-workflow.md`.
+
+Fem primitiver — alle versioneret med koden:
+
+| Primitive | Rolle |
+|-----------|-------|
+| `workspace/alignment.md` | Dette dokument. PRD-ækvivalent. |
+| `workspace/roadmap.md` | Ordnede stationer til launch + hvorfor. |
+| `workspace/decisions/<slug>.md` | Auditerbare beslutninger med tradeoffs og alternativer. |
+| `workspace/specs/<phase>.md` | Per-fase co-written spec. 1-2 sider. Frosset under eksekvering. |
+| `workspace/journal/YYYY-MM-DD.md` | Daglig session-log. H2 per session. |
+
+**Workflow per fase:**
+1. **Co-write fase-spec** (user + Claude). Låsepunktet.
+2. **Execute.** Kode + delegerede subagents. Beslutninger der dukker op fanges i `decisions/`. Daglig progress i `journal/`.
+3. **Wrap.** Verificer mod spec-acceptance. Opdater `alignment.md` hvis kerne-antagelser shiftede. Marker fasen done i roadmap.
+4. **Næste fase.**
+
+**Session-start (ny Claude):**
+Læs alignment + seneste 3-5 dages journal + alle decisions + nuværende spec hvis en fase er under eksekvering. ~10 minutter til fuld orientering.
 
 ### Plugins / skills vi anvender
 
-| Plugin | Hvornår | Formål |
-|--------|---------|--------|
-| MCP-byggeri plugin | Installeres først (fase 1) | Claude lærer MCP-app design grundigt før implementering |
-| Neon plugin | Hvis/når Neon vælges som DB | Serverless Postgres modellering, branching, query-mønstre |
-| skill-creator plugin | Når vi skriver vores første skills | Skill-distribution mekanik |
-| frontend design skill | Når vi rammer UI-laget | Minimal UI komponenter |
+| Plugin | Status | Formål |
+|--------|--------|--------|
+| mcp-apps (modelcontextprotocol/ext-apps) | Konsulteret (fase 1) | Plugin loadede ikke som Agent Skills. Marketplace-docs læst direkte. Digest: `workspace/raw/mcp-apps-docs-digest.md`. |
+| Neon plugin | Pending | Installeres hvis/når Neon vælges som DB. Serverless Postgres-mønstre, branching, queries. |
+| skill-creator plugin | Pending | Når vi skriver vores første skills. Skill-distributions mekanik. |
+| frontend design skill | Pending | Når UI-laget rammer Vite-pipeline. Minimal UI komponenter. |
 
-Bemærk: DB-valg er åbent. Kandidater:
-- **Neon** (serverless Postgres, Supabase-alternativ) - matcher usage-based pricing, branching-per-environment, pay-per-use cold-starts. Hvis vi går denne vej installeres Neon-plugin.
-- **SQLite** (embedded SQL) - deployed via Docker, simple ops, men ingen multi-region eller branching.
-- **Behold nuværende JSON-fil** + Docker - simpleste vej, men loft tidligt når vi rammer multi-user / concurrency.
+**DB-valg er åbent.** Kandidater:
+- **Neon** (serverless Postgres) — matcher usage-based pricing, branching-per-environment, pay-per-use cold-starts.
+- **SQLite** (embedded SQL) — deployed via Docker, simple ops, men ingen multi-region eller branching.
+- **Behold JSON + Docker** — simpleste vej, men skaleringsloft tidligt ved multi-user / concurrency.
 
-Valget tages efter vi har dømt domænemodellen i en senere fase.
+Valget tages efter domænemodellen er klar (se roadmap-station).
 
-**Status quo note:** Repo'en bruger pt. en JSON-fil i `~/.tilbudstrolden.json` med Zod-validation og mutex - det er **ikke** SQLite. Hvis vi vælger SQLite, er det første migration. Hvis vi vælger Neon, er det større migration. Hvis vi beholder JSON, er ændringen mindre men skalerings-loftet kommer hurtigere.
+### Workspace primitiver
 
-### Context management harness
+Per user's harness — alle primitiver er optional, vi tilføjer dem når arbejdet kalder på det. Tom mappe oprettes ikke preemptively.
 
-User's standard metode (verbatim - bruges optional, ikke alle workspaces har brug for alt):
+- **`raw/`:** Immutable inputs. Markdown, transkripter, PDFs, link dumps. Provenance i tilhørende journal-entry.
+- **`journal/`:** En markdown-fil per dag, navngivet `YYYY-MM-DD.md` (ISO-format så `ls` sorterer kronologisk). Sessions inden for samme dag er H2-sektioner: `## [HH:MM] {topic}`. Hvis flere distincte sessions samme dag har brug for separat reference, suffix med `-{topic}` (fx `2026-05-19-ui-quirks.md`). Andre docs kan pege på en bestemt dato for kontekst.
+- **`decisions/`:** AgDR-style records, en fil per beslutning. Frontmatter + body. Bruges når en beslutning skal være auditerbar senere.
+- **`specs/`:** Per-fase specs. Oprettes når vi går i gang med en roadmap-station.
 
-Each workspace of mine may use these optional folders depending on its work pattern. Not every workspace needs all of them. Do not preemptively create empty folders; add a primitive when the work actually calls for it.
-
-- `raw/`: immutable inputs. Whatever the source is in original form: markdown, transcripts, PDFs, images, link dumps. Most raw entries have no frontmatter; provenance lives in the workspace's `log.md`.
-- `journal/`: append-only session log. Date-prefixed entries (`## [YYYY-MM-DD HH:MM] {topic}`) so `grep` and `tail` work cleanly. Documents what happened, what was decided in passing, what is open.
-- `decisions/`: AgDR-style decision records, one file per decision. Frontmatter: `type: decision`, `agent`, `model`, `timestamp`, `status`. Body: Y-statement (context, concern, decision, goal, tradeoff). Use when a workspace produces decisions that should be auditable later.
-
-**decision template:**
+**Decision template:**
 
 ```
 ---
@@ -161,8 +234,8 @@ type: decision
 date: YYYY-MM-DD
 agent: claude
 timestamp: YYYY-MM-DDTHH:MM:SSZ
-status: proposed
-tags: [decision]
+status: proposed | accepted | superseded
+tags: [decision, ...]
 ---
 
 # {Decision title}
@@ -194,35 +267,39 @@ What we are giving up by choosing this option.
 
 ## Supersedes / superseded by
 
-If this decision replaces an earlier one, link it: `[[old-decision]]`. If it gets replaced later, update `status: superseded` and link forward.
+If this decision replaces an earlier one, link it. If it gets replaced later, update `status: superseded` and link forward.
 ```
 
-**Anvendelse i dette projekt:** Vi afgør pr. fase om vi tager primitiver i brug. Sandsynligt vi vil have `journal/` (append-only log af sessions og passively-made decisions) og `decisions/` (når vi vælger fx database, skill-distribution mekanik, payment processor). `raw/` kan blive relevant når vi samler brugerresearch eller eksterne inputs.
+---
+
+## Faser
+
+- **Fase 0 (done, 2026-05-18):** Alignment-dokument. Vision + arkitektur-skitse låst.
+- **Fase 1 (done, 2026-05-18):** Plugin/learning. mcp-apps-docs gennemlæst direkte. To kerne-antagelser korrigeret (skill-distribution + tre-lags arkitektur identificeret). Digest i `raw/`.
+- **Fase 2+:** Defineret af `workspace/roadmap.md`. Hver station co-writes som spec lige før eksekvering.
 
 ---
 
-## Faser (skitse, ikke detaljeret plan)
+## Åbne spørgsmål (post-fase-1)
 
-- **Fase 0 (nu):** Alignment-dokument. Bekræft fælles forståelse.
-- **Fase 1:** Plugin/learning. User installerer MCP-byggeri plugin. Claude arbejder igennem den for at lære moderne MCP-app design grundigt. Output: opdateret forståelse + eventuelle revisioner af alignment-doc.
-- **Fase 2+:** Defineres efter fase 1. Sandsynlige kandidater (i ingen bestemt rækkefølge): skills-mekanik prototype, backend domæne-modellering, repo/business-strategi-afklaring, brugerresearch.
+Fanget fra phase-1-digesten. Bliver afklaret som de bliver relevante for roadmap-stationer:
+
+1. **Multi-bruger hosting:** Hver bruger sin lokale MCP-server, central hosted, eller hybrid? Påvirker hvor lag C-orchestration og scheduled tasks lever. Skal afklares før DB-valg.
+2. **Scheduled tasks:** MCP er request-response. Cron-jobs lever serverside udenfor agent-flowet. Konkret mekanisme (Neon jobs, separat scheduler, agent-poll) afhænger af hosting-valg.
+3. **Image recognition:** mcp-apps-spec markerer file-uploads som "not yet implemented". Workaround: View accepterer billed-upload, base64-encoder, sender via app-only tool. Detalje for billed-station i roadmap.
+4. **Repo-strategi vs upstream.** Fork, license, samarbejde med `olgasafonova/tilbudstrolden-mcp`. Afklares før substantielle ændringer.
+5. **CSP for Tjek API:** Hvis View kalder Tjek direkte, må domænet declares i `connectDomains`. Sandsynligvis bedre at View kalder server-tool der kalder Tjek (lag C cache + retry).
+6. **Payment-flow:** UI initierer Stripe-session via app-only tool → server returnerer signed checkout URL → bruger gennemfører i out-of-band web UI → webhook opdaterer backend-state.
+7. **Skill-tier-detektering:** Klient-side gætværk (host-context hvis tilgængelig, ellers default tier 1 og lad agenten falde til tier 2/3).
 
 ---
 
-## Verifikation af dette alignment-dokument
+## Verifikation
 
 Dokumentet er valideret når:
+
 1. User læser dokumentet i sin helhed og bekræfter at vision, arkitektur og repo-state er kanonisk korrekt.
-2. Harness-sektionen er udfyldt med user's verbatim metode.
-3. Vi er eksplicit enige om at fase 1 (plugin/learning) er næste skridt - ikke implementeringskode.
+2. De fire låste decisions (`decisions/mcp-app-vs-classic-server.md`, `decisions/skill-distribution-tiered.md`, `decisions/three-layer-tool-architecture.md`, `decisions/per-phase-spec-workflow.md`) er gennemlæst og enige om.
+3. Roadmap-rækkefølgen i `workspace/roadmap.md` matcher hvad user vil launche først.
 
-Hvis user bekræfter ovenstående, exit-er vi plan mode og venter på plugin-installation før noget kodearbejde begynder.
-
----
-
-## Filer
-
-Eneste fil berørt i alignment-fasen:
-- `/root/.claude/plans/alright-ideen-er-der-synchronous-balloon.md` (dette dokument)
-
-Ingen ændringer i `/home/user/tilbudstrolden-mcp/` før vi forlader fase 0.
+Når ovenstående er enigt, går vi til roadmap-station 1 og co-writer dens spec.
