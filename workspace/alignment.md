@@ -10,7 +10,8 @@ Dokumentet er et levende artefakt. Når en sektion ændrer sig (fordi vi har læ
 
 - **Fase 0 (alignment): done.** Vision + arkitektur-skitse lagt fast 2026-05-18.
 - **Fase 1 (plugin/learning): done.** mcp-apps-marketplace gennemlæst direkte (plugin loadede ikke som Agent Skills). Digest i `workspace/raw/mcp-apps-docs-digest.md`. To kerne-antagelser i alignment-doc'et blev korrigeret som følge.
-- **Næste:** Roadmap er fastlagt i `workspace/roadmap.md`. Hver station co-writes som spec i `workspace/specs/` lige før den eksekveres.
+- **Station 1 (hosting + DB): done 2026-05-22.** Spec: `workspace/specs/01-hosting-and-db.md`. Decisions: `decisions/hosting-model.md` (central-hosted multi-tenant), `decisions/db-choice.md` (Postgres everywhere — Neon prod, docker-compose lokalt).
+- **Næste:** Roadmap-station 2 (backend domænemodel + migration fra JSON → Postgres). Co-writes som spec lige før eksekvering.
 
 ---
 
@@ -210,12 +211,7 @@ Læs alignment + seneste 3-5 dages journal + alle decisions + nuværende spec hv
 | skill-creator plugin | Pending | Når vi skriver vores første skills. Skill-distributions mekanik. |
 | frontend design skill | Pending | Når UI-laget rammer Vite-pipeline. Minimal UI komponenter. |
 
-**DB-valg er åbent.** Kandidater:
-- **Neon** (serverless Postgres) — matcher usage-based pricing, branching-per-environment, pay-per-use cold-starts.
-- **SQLite** (embedded SQL) — deployed via Docker, simple ops, men ingen multi-region eller branching.
-- **Behold JSON + Docker** — simpleste vej, men skaleringsloft tidligt ved multi-user / concurrency.
-
-Valget tages efter domænemodellen er klar (se roadmap-station).
+**DB-valg: locked 2026-05-22 — Postgres everywhere.** Neon serverless Postgres i prod, docker-compose Postgres lokalt. Rationale, tradeoffs og forkastede alternativer (SQLite-in-Docker, behold JSON+Docker, Supabase, PlanetScale, NoSQL) i `decisions/db-choice.md`.
 
 ### Workspace primitiver
 
@@ -284,8 +280,8 @@ If this decision replaces an earlier one, link it. If it gets replaced later, up
 
 Fanget fra phase-1-digesten. Bliver afklaret som de bliver relevante for roadmap-stationer:
 
-1. **Multi-bruger hosting:** Hver bruger sin lokale MCP-server, central hosted, eller hybrid? Påvirker hvor lag C-orchestration og scheduled tasks lever. Skal afklares før DB-valg.
-2. **Scheduled tasks:** MCP er request-response. Cron-jobs lever serverside udenfor agent-flowet. Konkret mekanisme (Neon jobs, separat scheduler, agent-poll) afhænger af hosting-valg.
+1. ~~**Multi-bruger hosting**~~ — **lukket 2026-05-22** med `decisions/hosting-model.md`: central-hosted multi-tenant.
+2. ~~**Scheduled tasks placement**~~ — **lukket 2026-05-22** som side-effect af hosting-beslutningen: scheduled tasks lever på vores server. Konkret scheduler-mekanisme (Neon scheduled queries / external cron / agent-poll) udskudt til roadmap-station 8 eller 11.
 3. **Image recognition:** mcp-apps-spec markerer file-uploads som "not yet implemented". Workaround: View accepterer billed-upload, base64-encoder, sender via app-only tool. Detalje for billed-station i roadmap.
 4. **Repo-strategi vs upstream.** Fork, license, samarbejde med `olgasafonova/tilbudstrolden-mcp`. Afklares før substantielle ændringer.
 5. **CSP for Tjek API:** Hvis View kalder Tjek direkte, må domænet declares i `connectDomains`. Sandsynligvis bedre at View kalder server-tool der kalder Tjek (lag C cache + retry).
