@@ -1,14 +1,69 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-settings.json",
-  "extraKnownMarketplaces": {
-    "modelcontextprotocol-ext-apps": {
-      "source": {
-        "source": "github",
-        "repo": "modelcontextprotocol/ext-apps"
-      }
-    }
-  },
   "enabledPlugins": {
-    "mcp-apps@modelcontextprotocol-ext-apps": true
+    "mcp-server-dev@claude-plugins-official": true,
+    "mcp-apps@mcp-apps": true
+  },
+  "permissions": {
+    "allow": [
+      "Read",
+      "Glob",
+      "Grep",
+      "Edit",
+      "Write",
+      "NotebookEdit",
+      "Agent",
+      "ToolSearch",
+      "TaskCreate",
+      "TaskUpdate",
+      "TaskList",
+      "TaskGet",
+      "TaskOutput",
+      "TaskStop",
+      "EnterPlanMode",
+      "ExitPlanMode",
+      "WebSearch",
+      "WebFetch",
+      "Bash",
+      "mcp__claude_ai_exa__company_research_exa",
+      "mcp__claude_ai_exa__crawling_exa",
+      "mcp__claude_ai_exa__deep_researcher_check",
+      "mcp__claude_ai_exa__deep_researcher_start",
+      "mcp__claude_ai_exa__deep_search_exa",
+      "mcp__claude_ai_exa__get_code_context_exa",
+      "mcp__claude_ai_exa__people_search_exa",
+      "mcp__claude_ai_exa__web_search_advanced_exa",
+      "mcp__claude_ai_exa__web_search_exa",
+      "mcp__claude_ai_firecrawl__firecrawl_scrape",
+      "mcp__claude_ai_firecrawl__firecrawl_search",
+      "mcp__claude_ai_firecrawl__firecrawl_extract",
+      "mcp__claude_ai_firecrawl__firecrawl_map",
+      "mcp__claude_ai_firecrawl__firecrawl_crawl",
+      "mcp__claude_ai_firecrawl__firecrawl_check_crawl_status",
+      "mcp__plugin_context7_context7__query-docs",
+      "mcp__plugin_context7_context7__resolve-library-id"
+    ],
+    "ask": [
+      "Bash(git push:*)",
+      "Bash(git commit:*)",
+      "Bash(gh pr create:*)",
+      "Bash(gh pr close:*)",
+      "Bash(gh pr merge:*)",
+      "Bash(gh issue create:*)",
+      "Bash(gh issue close:*)",
+      "Bash(gh release:*)",
+      "Bash(npm install:*)",
+      "Bash(npm uninstall:*)",
+      "Bash(npm publish:*)"
+    ],
+    "deny": [
+      "Bash(rm -rf:*)",
+      "Bash(git push --force:*)",
+      "Bash(git push -f:*)",
+      "Bash(git reset --hard:*)",
+      "Bash(git clean -fd:*)",
+      "Bash(git branch -D:*)",
+      "Bash(git checkout --:*)"
+    ]
   }
 }
