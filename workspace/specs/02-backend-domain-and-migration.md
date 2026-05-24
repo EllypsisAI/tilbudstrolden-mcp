@@ -1,6 +1,6 @@
 # Spec: Roadmap-station 2 — Backend domænemodel + migration fra JSON til Postgres
 
-Status: in progress (started 2026-05-24)
+Status: done (2026-05-24)
 Roadmap reference: [`workspace/roadmap.md` §2](../roadmap.md)
 
 ## Scope
@@ -43,14 +43,14 @@ Three locked design choices drive the work:
 
 ## Acceptance
 
-- `docker-compose up` brings local Postgres up cleanly. ☐
-- `npm run db:migrate` against a fresh local Postgres creates all tables, indexes, and RLS policies. ☐
-- `npm test` (existing vitest) passes against the Postgres-backed store — no test changes other than swapping the fixture from temp-JSON-file to test-tenant helper. ☐
-- New multi-tenant isolation test: two households exist; tenant A's session reads rows and sees only A's rows even when query has no `WHERE household_id` clause; same for B; cross-contamination causes the test to fail. ☐
-- `npm run typecheck` and `npm run lint` clean. ☐
-- One-off import script can ingest a sample `~/.tilbudstrolden.json` file into a fresh household row and the result round-trips through the standard store reads. ☐
-- All 18 existing MCP tools still function end-to-end against the new backend (verified by running the existing tool-integration tests, not by hand). ☐
-- Doc snippet exists explaining: spin up local DB, run migrations, point env at it. New contributors (including future Claude sessions) can get to a working dev loop without reading source. ☐
+- `docker-compose up` brings local Postgres up cleanly. ✅
+- `npm run db:migrate` against a fresh local Postgres creates all tables, indexes, and RLS policies. ✅
+- `npm test` (existing vitest) passes against the Postgres-backed store — no test changes other than swapping the fixture from temp-JSON-file to test-tenant helper. ✅
+- New multi-tenant isolation test: two households exist; tenant A's session reads rows and sees only A's rows even when query has no `WHERE household_id` clause; same for B; cross-contamination causes the test to fail. ✅
+- `npm run typecheck` and `npm run lint` clean. ✅
+- One-off import script can ingest a sample `~/.tilbudstrolden.json` file into a fresh household row and the result round-trips through the standard store reads. ✅
+- All 18 existing MCP tools still function end-to-end against the new backend (verified by running the existing tool-integration tests, not by hand). ✅
+- Doc snippet exists explaining: spin up local DB, run migrations, point env at it. New contributors (including future Claude sessions) can get to a working dev loop without reading source. ✅
 
 ## Method
 

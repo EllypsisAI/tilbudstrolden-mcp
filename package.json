@@ -42,10 +42,20 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
+    "db:up": "bash scripts/db-up.sh",
+    "db:down": "bash scripts/db-down.sh",
+    "db:reset": "bash scripts/db-down.sh --volumes && bash scripts/db-up.sh && npm run db:migrate && npm run db:bootstrap",
+    "db:migrate": "tsx src/db/migrate.ts",
+    "db:bootstrap": "tsx src/db/bootstrap.ts",
+    "db:generate": "drizzle-kit generate",
+    "db:import-json": "tsx scripts/import-json-store.ts",
+    "setup": "npm run db:up && npm run db:migrate && npm run db:bootstrap",
     "prepublishOnly": "npm run build"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.28.0",
+    "drizzle-orm": "^0.45.2",
+    "pg": "^8.21.0",
     "zod": "^4.3.6"
   },
   "overrides": {
@@ -54,6 +64,8 @@
   "devDependencies": {
     "@biomejs/biome": "^2.4.9",
     "@types/node": "^25.5.0",
+    "@types/pg": "^8.20.0",
+    "drizzle-kit": "^0.31.10",
     "tsx": "^4.0.0",
     "typescript": "^5.3.0",
     "vitest": "^4.1.2"

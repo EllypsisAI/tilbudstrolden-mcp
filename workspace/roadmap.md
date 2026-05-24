@@ -148,7 +148,8 @@ Rækkefølgen reflekterer afhængigheder. Vi kan parallelisere mellem stationer 
 ## Status
 
 - **Station 1 (Hosting + DB): done 2026-05-22.** Spec: `specs/01-hosting-and-db.md`. Decisions: `decisions/hosting-model.md`, `decisions/db-choice.md`. Journal: `journal/2026-05-22.md`.
-- **Station 2 (Backend domænemodel + migration fra JSON): næste.** Co-write spec lige før eksekvering.
-- Stations 3-12: skitseret, ikke spec'et.
+- **Station 2 (Backend domænemodel + migration fra JSON): done 2026-05-24.** Spec: `specs/02-backend-domain-and-migration.md`. Drizzle + RLS + JSONB-for-bounded-embeds, one-off JSON importer, docker-compose for local Postgres, system-Postgres fallback. 242 tests passing (227 existing pure-function + 15 new live-DB). Journal: `journal/2026-05-24.md`.
+- **Station 3 (Auth + multi-user identity): næste.** Co-write spec lige før eksekvering.
+- Stations 4-12: skitseret, ikke spec'et.
 
 Når en station er done, marker den her med dato og link til spec + decisions + journal-entry.

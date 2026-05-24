@@ -67,8 +67,17 @@ All deal data is fetched via the [etilbudsavis.dk](https://etilbudsavis.dk) (Tje
 git clone https://github.com/olgasafonova/tilbudstrolden-mcp.git
 cd tilbudstrolden-mcp
 npm install
+npm run setup        # brings up Postgres, applies migrations, creates your household
 npm run build
 ```
+
+`npm run setup` is a one-liner over three steps:
+
+1. **`npm run db:up`** — spins up Postgres. With Docker installed it uses `docker compose up -d db`; otherwise it falls back to a system Postgres install (Ubuntu/Debian). Writes the `DATABASE_URL` to `.env.local`.
+2. **`npm run db:migrate`** — applies the schema (households, meal log, spend log) and the Row-Level Security policies that isolate one household's data from another.
+3. **`npm run db:bootstrap`** — generates a `TILBUDSTROLDEN_HOUSEHOLD_ID` if you don't have one yet, and ensures the household row exists in Postgres. Run it again any time without harm.
+
+If you have a legacy `~/.tilbudstrolden.json` data file from earlier versions, run `npm run db:import-json` once to migrate it into the database.
 
 ### Connect to your MCP client
 

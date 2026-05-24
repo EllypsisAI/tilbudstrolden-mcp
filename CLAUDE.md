@@ -21,8 +21,10 @@ We build as an **MCP App**, not a classic MCP server. See `workspace/decisions/m
 
 ## Repo facts — don't misremember
 
-- State today is a JSON file at `~/.tilbudstrolden.json`. Not SQLite. Plan migrations from JSON.
-- 18 MCP tools already cover deals, recipes, planning, shopping, household, pantry, log. Extend, don't reimplement.
+- State lives in Postgres (station 2, 2026-05-24). Schema in `src/db/schema.ts`, migrations in `src/db/migrations/`. Per-household isolation enforced by RLS — every read/write goes through `withTenant(householdId, ...)` in `src/db/with-tenant.ts`.
+- Local dev: `docker compose up -d db` (or the system-Postgres fallback in `scripts/db-up.sh`), then `npm run setup`. `.env.local` holds `DATABASE_URL` + `TILBUDSTROLDEN_HOUSEHOLD_ID`.
+- Legacy `~/.tilbudstrolden.json` is no longer touched at runtime. The one-off importer (`npm run db:import-json`) migrates it into a household row.
+- 18 MCP tools already cover deals, recipes, planning, shopping, household, pantry, log. Extend, don't reimplement. Their public store API is unchanged from the JSON era.
 - `src/api.ts` already has retry, timeout, concurrency limit, dealer cache for the Tjek API. Reuse the pattern.
 - Multi-country (DK/NO/SE/FI) is baked into the data flow. Don't add a country field; it exists.
 
@@ -55,7 +57,7 @@ Locked decisions live in `workspace/decisions/`. The current ones:
 - `per-phase-spec-workflow.md` — hybrid spec-driven, co-written specs per roadmap-station.
 
 Operational reminders:
-- "Neo" means Neon (serverless Postgres). Not Neo4j. The DB choice itself is roadmap station 1 — still open.
+- "Neo" means Neon (serverless Postgres). Not Neo4j. Hosting + DB locked in station 1.
 - Model identifier removed from decision template; `agent: claude` only.
 - Workspace lives in `/workspace` inside the repo so it commits with the code.
 
@@ -69,9 +71,9 @@ Don't write a specific model version identifier into any committed file. Use `cl
 
 ## When to ask first
 
-- DB choice (Neon, SQLite, JSON+Docker).
 - Repo strategy with upstream (`olgasafonova/tilbudstrolden-mcp`) — fork, license, collaboration.
 - Adding a new MCP tool — tools are part of the architecture, not an implementation detail.
+- Schema migrations that drop/rename existing columns or tables (additive migrations are safe; destructive ones change observable state).
 - Any change to `workspace/alignment.md`. Update with the user, not unilaterally.
 
 ## What to do silently

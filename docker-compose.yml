@@ -1,0 +1,21 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: tilbudstrolden-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: tilbudstrolden
+      POSTGRES_USER: tilbudstrolden
+      POSTGRES_PASSWORD: tilbudstrolden_dev
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - tilbudstrolden_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tilbudstrolden -d tilbudstrolden"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+
+volumes:
+  tilbudstrolden_pgdata:
