@@ -11,6 +11,7 @@ Dokumentet er et levende artefakt. Når en sektion ændrer sig (fordi vi har læ
 - **Fase 0 (alignment): done.** Vision + arkitektur-skitse lagt fast 2026-05-18.
 - **Fase 1 (plugin/learning): done.** mcp-apps-marketplace gennemlæst direkte (plugin loadede ikke som Agent Skills). Digest i `workspace/raw/mcp-apps-docs-digest.md`. To kerne-antagelser i alignment-doc'et blev korrigeret som følge.
 - **Station 1 (hosting + DB): done 2026-05-22.** Spec: `workspace/specs/01-hosting-and-db.md`. Decisions: `decisions/hosting-model.md` (central-hosted multi-tenant), `decisions/db-choice.md` (Postgres everywhere — Neon prod, docker-compose lokalt).
+- **Tool-design metodologi: locked 2026-05-24.** `decisions/tool-design-methodology.md` — hver tool designes via dual POV (operating agent + end user); arketype (agent-driven / server-beriget / server-deterministisk) emerger pr tool, ikke som global default. Påvirker roadmap-stations 5, 7 og 8 (meal-log og suggest_meals omformuleret).
 - **Næste:** Roadmap-station 2 (backend domænemodel + migration fra JSON → Postgres). Co-writes som spec lige før eksekvering.
 
 ---
@@ -77,7 +78,9 @@ Beslutning: `decisions/three-layer-tool-architecture.md`.
 | **B — App-only** (`visibility: ["app"]`) | Kun UI | Polling, chunking, interaktive primitiver | `poll_image_analysis`, `get_recipe_chunk`, `confirm_pantry_changes`, `request_payment_session` |
 | **C — Internt** | Ingen MCP-eksponering | Ren TypeScript-orchestration | Tjek-cache, embedding-similarity, scoring-pipeline, retry-logik, optimering |
 
-Det er hvad der skiller en agent-native app fra en tools-bag. I dag har vi 18 model-visible tools — agenten vælger trin for trin og kan slude. Efter konsolidering vælger agenten mellem 4-6 kapabiliteter; serveren orkestrerer internt. Compounding-værdi (Tjek-cache, scoring) bor i lag C og høster afkast hver gang lag A/B kalder den.
+Det er hvad der skiller en agent-native app fra en tools-bag. I dag har vi 18 model-visible tools — agenten vælger trin for trin og kan slude. Efter konsolidering vælger agenten mellem 4-6 kapabiliteter; serveren leverer data, compounding og orkestrering hvor det giver mening — men *hvor reasoning bor* afgøres pr tool, ikke globalt. Compounding-værdi (Tjek-cache, scoring) bor i lag C og høster afkast hver gang lag A/B kalder den.
+
+**Hvor reasoning bor pr tool.** Tre-lags-modellen besvarer "hvilke tools ser hvem?" Den besvarer ikke "hvor bor reasoning?". Det gør `decisions/tool-design-methodology.md`: hver tool designes via dual POV (operating agent + end user) før vi vælger arketype — **agent-driven** (tool er dum sink/source; agenten ræsonnerer via skill + native capabilities), **server-beriget** (tool returnerer rig scoret kontekst som agenten ræsonnerer over), eller **server-deterministisk** (tool returnerer "svaret"; sjælden, kræver eksplicit begrundelse). Hybrid er den emergente form af systemet, ikke en strategi vi vælger. Eksemplerne i tabellen ovenfor (`suggest_meals`, `log_meal`, m.fl.) er kapabilitets-navne — deres faktiske model afgøres ved tool-design, ikke her.
 
 ### Skill-distribution: tieret med user-permission gate
 
@@ -282,7 +285,7 @@ Fanget fra phase-1-digesten. Bliver afklaret som de bliver relevante for roadmap
 
 1. ~~**Multi-bruger hosting**~~ — **lukket 2026-05-22** med `decisions/hosting-model.md`: central-hosted multi-tenant.
 2. ~~**Scheduled tasks placement**~~ — **lukket 2026-05-22** som side-effect af hosting-beslutningen: scheduled tasks lever på vores server. Konkret scheduler-mekanisme (Neon scheduled queries / external cron / agent-poll) udskudt til roadmap-station 8 eller 11.
-3. **Image recognition:** mcp-apps-spec markerer file-uploads som "not yet implemented". Workaround: View accepterer billed-upload, base64-encoder, sender via app-only tool. Detalje for billed-station i roadmap.
+3. ~~**Image recognition:**~~ — **lukket 2026-05-24** med `decisions/tool-design-methodology.md`: meal-log-pathen løses ved host-multimodal + skill-protokol, ikke server-side vision pipeline. mcp-apps file-uploads-gap er derfor moot for denne use-case. Forbliver åbent kun hvis fremtidige use-cases (fx kvittering-OCR) kræver billedbytes server-side.
 4. **Repo-strategi vs upstream.** Fork, license, samarbejde med `olgasafonova/tilbudstrolden-mcp`. Afklares før substantielle ændringer.
 5. **CSP for Tjek API:** Hvis View kalder Tjek direkte, må domænet declares i `connectDomains`. Sandsynligvis bedre at View kalder server-tool der kalder Tjek (lag C cache + retry).
 6. **Payment-flow:** UI initierer Stripe-session via app-only tool → server returnerer signed checkout URL → bruger gennemfører i out-of-band web UI → webhook opdaterer backend-state.

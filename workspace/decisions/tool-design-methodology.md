@@ -3,7 +3,7 @@ type: decision
 date: 2026-05-24
 agent: claude
 timestamp: 2026-05-24T14:07:00Z
-status: proposed
+status: accepted
 tags: [decision, architecture, tools, methodology]
 ---
 

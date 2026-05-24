@@ -52,11 +52,11 @@ Rækkefølgen reflekterer afhængigheder. Vi kan parallelisere mellem stationer 
 
 ## 5. Tool-konsolidering (lag A/B/C refactor)
 
-**Hvad:** De 18 nuværende tools kollapses til 4-6 model-visible (lag A) + et lille sæt app-only primitiver (lag B). Lag C-funktioner extraheres til rene TypeScript-moduler bag de nye tools. Eksisterende vitest-tests opdateres til at teste de nye semantiske kapabiliteter.
+**Hvad:** De 18 nuværende tools kollapses til 4-6 model-visible (lag A) + et lille sæt app-only primitiver (lag B). Lag C-funktioner extraheres til rene TypeScript-moduler bag de nye tools. Per `decisions/tool-design-methodology.md`: hvert konsolideret tool får sin arketype (agent-driven, server-beriget, eller server-deterministisk) via dual-POV-walkthrough; vi antager ikke en global model. Eksisterende vitest-tests opdateres til at teste de nye semantiske kapabiliteter.
 
 **Hvorfor:** Tre-lags-arkitekturen er hjørnestenen i agent-native-distinktionen. Indtil refactoren er gjort, eksponerer vi stadig 18 tools til modellen og spilder compounding-værdi. Vi gør den tidligt for at undgå at bygge flere features på toppen af tools-bag-strukturen.
 
-**Acceptance:** ≤6 model-visible tools. Lag C-moduler unit-tested. Eksisterende integration-tests passerer mod nye tools (semantik bevaret, surface kollapset).
+**Acceptance:** ≤6 model-visible tools. Per-tool arketype-begrundelse dokumenteret kort (kode-kommentar eller spec-note). Lag C-moduler unit-tested. Eksisterende integration-tests passerer mod nye tools (semantik bevaret, surface kollapset).
 
 ---
 
@@ -72,25 +72,25 @@ Rækkefølgen reflekterer afhængigheder. Vi kan parallelisere mellem stationer 
 
 ---
 
-## 7. Billed-recognition for måltidslogning
+## 7. Meal-log: skill + `log_meal` tool
 
-**Hvad:** View accepterer billed-upload (drag-drop eller file-picker), base64-encoder, sender via app-only tool (`upload_meal_image` eller lignende). Backend kalder vision-API (Claude vision via Anthropic SDK eller andet), parser ingredienser, returnerer struktureret forslag til agenten der så bekræfter med brugeren. Pantry og meal-log opdateres atomisk.
+**Hvad:** Skriv meal-log-skill (klient-side protokol: "når brugeren deler et måltidsbillede eller beskriver hvad de spiste, estimér ingredienser via agentens native multimodal, spørg afklarende ved tvivl, spørg portioner, kald derefter `log_meal` med struktureret input"). Implementér `log_meal`-tool med struktureret input-schema (ingredienser, portioner, timestamp). Backend opdaterer atomisk meal-log + pantry-decrement. Optional correction-View som UI-primitiv hvis hurtig brugerretning viser sig værdifuld.
 
-**Hvorfor:** Det er den primære anti-friktion-feature i visionen. Uden den falder vi tilbage til manuel logning, som er præcis hvad mad-apps churner på.
+**Hvorfor:** Per `decisions/tool-design-methodology.md`: host-agentens native multimodal + reasoning er kapabilitet vi får gratis. Server-side vision pipeline duplikerer det og introducerer latency. Skill bærer protokollen så agenten reliably gør det rigtige; tool'et er en simpel mutation. Det er den primære anti-friktion-feature i visionen, leveret via skill + simple tool — ikke server-side OCR.
 
-**Workaround for spec-gap:** mcp-apps markerer file-uploads som "not yet implemented" i migration-guide. Vi løser via base64-i-tool-argument og app-only tool — ikke skønt, men virker indtil spec-feltet lander.
+**Acceptance:** Tier 1-skill installeret og virker på Claude Desktop. End-to-end test: bruger sender måltidsbillede → agent estimerer + spørger portioner → `log_meal` kaldes med struktureret input → backend opdaterer meal-log + pantry atomisk. Tier 3-fallback (tekst-baseret beskrivelse uden skill) virker også. Edge cases: ukendte ingredienser, brugerafvisning af gæt, partial pantry-match.
 
-**Acceptance:** Billed-upload til måltidslog virker end-to-end (UI → backend → vision API → ingredienser → pantry-opdatering). Test af edge cases (mørke billeder, ukendte ingredienser, brugerafvisning af gæt).
+**Forudsætning:** Skill-distribution-infrastruktur fra station 6 skal være på plads før skill-delen virker. Hvis vi vil starte meal-log før onboarding er færdig, kan vi shippe tier-3 først (ren tool + tekst-instruktioner) og lægge skill ovenpå senere.
 
 ---
 
-## 8. Suggest_meals pipeline (lag C orchestration)
+## 8. Suggest_meals: tools + skill via per-tool POV-design
 
-**Hvad:** Implementér den fulde forslag-pipeline: læs pantry → query Tjek (cached) → score recipes med embedding-similarity → check meal-history (variation) → optimer for tid/pris/diæt → returner top-N med alternativer-UI. Alt internt i lag C bag ét lag A-tool.
+**Hvad:** Design suggestion-flow'et via per-tool POV-walkthrough (`decisions/tool-design-methodology.md`). Sandsynligt resultat — men skal komme ud af analysen, ikke antages: server-beriget kontekst-samling (ét tool returnerer pantry + scored deal-candidates + history-variation-flags fra lag C compounding) + agent-driven reasoning over shortlist + UI-primitiv til præsentation/valg. Modsat tidligere formulering bygger vi *ikke* en server-deterministisk pipeline der returnerer "svaret".
 
-**Hvorfor:** Det her er det compounding-værdi-eksempel der demonstrerer tre-lags-modellen i praksis. Når denne pipeline kører i serveren, og agenten kalder ét tool, har vi bygget noget der reelt er agent-native i stedet for tools-bag.
+**Hvorfor:** Compounding-værdien (Tjek-cache, embedding-sim, scoring) er reel og hører hjemme i lag C. Men den endelige vurdering (passer dette familien i dag? matcher det stemningen i samtalen?) er reasoning host-agenten gør bedre end vores deterministik. POV-walkthrough vælger den rigtige form for hvert tool i flow'et — arketype låses ikke før analysen er kørt.
 
-**Acceptance:** En model-call resulterer i ét tool-kald, der internt udfører 5-10 lag C-trin og returnerer struktureret forslag + View. Performance-budget overholdt (cache-hit-rate, samlet latency).
+**Acceptance:** Per-tool POV-walkthrough dokumenteret for hver tool i suggestion-flow'et (begrundelse for arketype-valg). Lag C-moduler (Tjek-cache, scoring, similarity) unit-tested. End-to-end test: bruger spørger om aftensmadsforslag → agent fetcher beriget kontekst i ét eller få kald → agent ræsonnerer + præsenterer top-N → bruger vælger. Latency-budget overholdt.
 
 ---
 
