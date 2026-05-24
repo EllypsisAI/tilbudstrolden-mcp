@@ -12,11 +12,9 @@ import { randomUUID } from "node:crypto";
 import { appendFileSync, existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { defaultRecipes } from "../default-recipes.js";
-import { DEFAULT_HOUSEHOLD, type Recipe } from "../store-types.js";
 import { closePool } from "./client.js";
 import { loadEnv } from "./env.js";
-import { households } from "./schema.js";
+import { seedHousehold } from "./seed-household.js";
 import { withoutTenant, withTenant } from "./with-tenant.js";
 
 const ENV_FILE = ".env.local";
@@ -67,15 +65,8 @@ async function householdExists(householdId: string): Promise<boolean> {
 }
 
 async function createHousehold(householdId: string, country: string): Promise<void> {
-  const seedRecipes: Recipe[] = country === "DK" ? [...defaultRecipes] : [];
-  const profile = { ...DEFAULT_HOUSEHOLD, country };
   await withTenant(householdId, async (db) => {
-    await db.insert(households).values({
-      id: householdId,
-      household: profile,
-      pantry: [],
-      recipes: seedRecipes,
-    });
+    await seedHousehold(db, { id: householdId, country });
   });
 }
 

@@ -75,10 +75,31 @@ export const spendLogEntries = pgTable(
   (table) => [index("spend_log_household_date_idx").on(table.householdId, table.date.desc())],
 );
 
+/**
+ * Identity → tenant mapping. WorkOS issues a stable `sub` per
+ * Google/Microsoft account; we keep our own household_id so the
+ * auth provider can change without rewriting tenant-scoped rows.
+ *
+ * NOT under RLS — see `migrations/0001_users.sql`.
+ */
+export const users = pgTable("users", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  workosSub: text("workos_sub").notNull().unique(),
+  householdId: uuid("household_id")
+    .notNull()
+    .references(() => households.id, { onDelete: "restrict" }),
+  email: text("email"),
+  provider: text("provider"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 export type HouseholdRow = typeof households.$inferSelect;
 export type MealLogRow = typeof mealLogEntries.$inferSelect;
 export type SpendLogRow = typeof spendLogEntries.$inferSelect;
+export type UserRow = typeof users.$inferSelect;
 
 export type NewHouseholdRow = typeof households.$inferInsert;
 export type NewMealLogRow = typeof mealLogEntries.$inferInsert;
 export type NewSpendLogRow = typeof spendLogEntries.$inferInsert;
+export type NewUserRow = typeof users.$inferInsert;

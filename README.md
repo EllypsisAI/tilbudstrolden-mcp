@@ -79,6 +79,11 @@ npm run build
 
 If you have a legacy `~/.tilbudstrolden.json` data file from earlier versions, run `npm run db:import-json` once to migrate it into the database.
 
+### Two transports
+
+- **stdio** (`npm start`) — single-tenant, local. The household id comes from `.env.local`. This is the default and what the client instructions below assume.
+- **Streamable HTTP** (`npm run dev:http`) — multi-user with WorkOS OAuth. Each request carries its own JWT; the server resolves it to a household row and runs the tool with the right tenant scope. See [`docs/workos-setup.md`](docs/workos-setup.md) for setup and [`docs/auth-flow.md`](docs/auth-flow.md) for how the request → household pipeline works.
+
 ### Connect to your MCP client
 
 Pick your client below. All use stdio transport; no API keys or auth required.

@@ -12,7 +12,9 @@ Dokumentet er et levende artefakt. Når en sektion ændrer sig (fordi vi har læ
 - **Fase 1 (plugin/learning): done.** mcp-apps-marketplace gennemlæst direkte (plugin loadede ikke som Agent Skills). Digest i `workspace/raw/mcp-apps-docs-digest.md`. To kerne-antagelser i alignment-doc'et blev korrigeret som følge.
 - **Station 1 (hosting + DB): done 2026-05-22.** Spec: `workspace/specs/01-hosting-and-db.md`. Decisions: `decisions/hosting-model.md` (central-hosted multi-tenant), `decisions/db-choice.md` (Postgres everywhere — Neon prod, docker-compose lokalt).
 - **Tool-design metodologi: locked 2026-05-24.** `decisions/tool-design-methodology.md` — hver tool designes via dual POV (operating agent + end user); arketype (agent-driven / server-beriget / server-deterministisk) emerger pr tool, ikke som global default. Påvirker roadmap-stations 5, 7 og 8 (meal-log og suggest_meals omformuleret).
-- **Næste:** Roadmap-station 2 (backend domænemodel + migration fra JSON → Postgres). Co-writes som spec lige før eksekvering.
+- **Station 2 (backend domain + migration): done 2026-05-24.** Drizzle + RLS + JSONB-for-bounded-embeds, JSON-importer one-off.
+- **Station 3 (auth + multi-user identity): done 2026-05-24.** WorkOS AuthKit som authorization server (`decisions/auth-provider.md`); vi som resource server validerer JWTs (jose, RFC 8707 audience). Identity → tenant via `users` table, race-safe atomic seed-or-lookup. Per-request tenant scope via `AsyncLocalStorage` så de eksisterende store-funktioner virker uændret. Streamable HTTP runner stateless (fresh transport per request). 273 tests passing.
+- **Næste:** Roadmap-station 4 (MCP App skeleton + første View). Co-writes som spec lige før eksekvering.
 
 ---
 

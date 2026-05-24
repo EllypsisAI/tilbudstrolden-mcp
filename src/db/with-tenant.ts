@@ -19,6 +19,7 @@
  * query tagging, and timeouts — they go in `withTenant`, not in N call sites.
  */
 
+import { AsyncLocalStorage } from "node:async_hooks";
 import type { Db } from "./client.js";
 import { drizzleOn, getPool } from "./client.js";
 
@@ -31,18 +32,51 @@ function assertUuid(value: string, label: string): void {
 }
 
 /**
+ * Per-request tenant context. The HTTP runner sets this in middleware after
+ * resolving the JWT → household; tool callbacks running inside
+ * `transport.handleRequest()` inherit it via Node's async-context propagation.
+ *
+ * Stdio runner never enters the store, so reads fall through to the env var.
+ */
+const requestHouseholdStore = new AsyncLocalStorage<string>();
+
+/**
+ * Run `fn` with `householdId` installed as the ambient tenant for the
+ * duration of this async stack. Used by the HTTP middleware to wrap each
+ * authenticated request so any downstream `store.X()` call resolves the
+ * household from the request, not from the process env.
+ *
+ * Nestable; an inner call shadows the outer one. The store reverts on exit.
+ */
+export function runWithHousehold<T>(householdId: string, fn: () => T | Promise<T>): T | Promise<T> {
+  assertUuid(householdId, "householdId");
+  return requestHouseholdStore.run(householdId, fn);
+}
+
+/**
  * Resolve the household id for an ambient call (no explicit context given).
- * Reads `TILBUDSTROLDEN_HOUSEHOLD_ID` from the environment. Station 3 will
- * replace this with a per-request token-derived value; until then a single
- * env var is enough to run single-tenant dev.
+ *
+ * Precedence:
+ *   1. The AsyncLocalStorage value, if a request scope is active. This is
+ *      how authenticated HTTP requests set their per-request household.
+ *   2. `TILBUDSTROLDEN_HOUSEHOLD_ID` from the environment. Used by the stdio
+ *      runner for single-tenant local dev (no WorkOS round-trip needed).
+ *
+ * Throws when neither is available — the only "no household" outcome we
+ * allow is the explicit `withoutTenant()` escape hatch.
  */
 export function ambientHouseholdId(): string {
+  const fromRequest = requestHouseholdStore.getStore();
+  if (fromRequest && fromRequest.length > 0) {
+    return fromRequest;
+  }
   const id = process.env.TILBUDSTROLDEN_HOUSEHOLD_ID;
   if (!id || id.length === 0) {
     throw new Error(
-      "No household context. Set TILBUDSTROLDEN_HOUSEHOLD_ID in .env.local " +
-        '(generate one with: node -e "console.log(crypto.randomUUID())") ' +
-        "or pass an explicit id to withTenant().",
+      "No household context. Either run inside an authenticated HTTP request " +
+        "(server-http.ts wraps each request in runWithHousehold) or set " +
+        "TILBUDSTROLDEN_HOUSEHOLD_ID in .env.local (generate with: " +
+        'node -e "console.log(crypto.randomUUID())").',
     );
   }
   assertUuid(id, "TILBUDSTROLDEN_HOUSEHOLD_ID");
